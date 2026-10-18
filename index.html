@@ -1,0 +1,1421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MIDI to Bloxd</title>
+<style>
+  :root {
+    --chalk: #EEF1EA;
+    --paper: #FFFFFF;
+    --ink: #1B2733;
+    --ink-soft: #4A5866;
+    --line: #D3DACD;
+    --grass: #3F9B3A;
+    --grass-dark: #2A7126;
+    --grass-tint: #E4F3DF;
+    --dirt: #7A5230;
+    --gold: #F4B63F;
+    --gold-tint: #FDF1D6;
+    --sky: #5CB8E6;
+    --sky-tint: #E1F2FB;
+    --night: #17212B;
+    --night-line: #2C3B4A;
+    --danger: #C9402F;
+    --font-display: "Arial Rounded MT Bold", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+    --font-body: system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-code: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html { scroll-behavior: auto; }
+  @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+
+  body {
+    margin: 0;
+    background-color: var(--chalk);
+    background-image:
+      linear-gradient(rgba(27, 39, 51, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(27, 39, 51, 0.045) 1px, transparent 1px);
+    background-size: 32px 32px;
+    color: var(--ink);
+    font: 15px/1.55 var(--font-body);
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 0 16px 72px; }
+
+  :focus-visible { outline: 3px solid var(--sky); outline-offset: 2px; }
+
+  /* ---------- Header ---------- */
+  .top { display: flex; gap: 16px; align-items: center; padding: 30px 0 20px; }
+  .logo { display: grid; grid-template-columns: repeat(2, 20px); gap: 3px; flex: none; }
+  .logo i { display: block; width: 20px; height: 20px; border: 2.5px solid var(--ink); border-radius: 3px; }
+  .logo i:nth-child(1) { background: var(--grass); }
+  .logo i:nth-child(2) { background: var(--sky); }
+  .logo i:nth-child(3) { background: var(--gold); }
+  .logo i:nth-child(4) { background: var(--dirt); }
+  h1 { font: 800 32px/1.1 var(--font-display); margin: 0; letter-spacing: -0.01em; }
+  .tagline { margin: 4px 0 0; color: var(--ink-soft); }
+
+  /* ---------- Step navigation ---------- */
+  .steps {
+    position: sticky; top: 10px; z-index: 20;
+    display: flex;
+    background: var(--paper);
+    border: 3px solid var(--ink);
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 0 0 30px;
+    box-shadow: 0 5px 0 var(--dirt);
+  }
+  .steps a {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 10px 6px; color: var(--ink); text-decoration: none;
+    font-weight: 700; font-size: 14px; border-left: 2px solid var(--line);
+  }
+  .steps a:first-child { border-left: 0; }
+  .steps .num {
+    display: grid; place-items: center; width: 26px; height: 26px;
+    border: 2.5px solid var(--ink); border-radius: 5px; background: var(--paper);
+    font-size: 13px; font-weight: 800;
+  }
+  .steps a.active { background: var(--grass-tint); }
+  .steps a.active .num { background: var(--grass); color: #fff; }
+  .steps a.done .num { background: var(--gold); }
+  body:not(.loaded) .steps a:not([data-step="s1"]) { opacity: 0.45; pointer-events: none; }
+
+  /* ---------- Step cards ---------- */
+  .step {
+    background: linear-gradient(var(--grass) 0 10px, transparent 10px), var(--paper);
+    border: 3px solid var(--ink);
+    border-radius: 12px;
+    padding: 32px 24px 24px;
+    margin: 0 0 34px;
+    box-shadow: 0 7px 0 var(--dirt);
+    scroll-margin-top: 84px;
+  }
+  .step h2 { font: 800 24px/1.2 var(--font-display); margin: 0 0 4px; }
+  .step .lead { margin: 0 0 20px; color: var(--ink-soft); }
+  .subhead { font: 800 18px/1.3 var(--font-display); margin: 30px 0 12px; }
+
+  /* ---------- Controls ---------- */
+  button {
+    font: 700 14px/1 var(--font-body);
+    color: var(--ink); background: var(--paper);
+    border: 2.5px solid var(--ink); border-radius: 8px;
+    padding: 10px 14px; cursor: pointer;
+    box-shadow: 0 3px 0 var(--ink);
+    transition: transform 0.06s, box-shadow 0.06s;
+  }
+  button:hover { background: var(--gold-tint); }
+  button:active { transform: translateY(3px); box-shadow: 0 0 0 var(--ink); }
+  button.primary { background: var(--grass); color: #fff; }
+  button.primary:hover { background: var(--grass-dark); }
+  button.small { padding: 6px 10px; font-size: 13px; box-shadow: 0 2px 0 var(--ink); }
+  button.small:active { transform: translateY(2px); }
+  button.copied { background: var(--gold); color: var(--ink); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  input[type=text], input[type=number], select {
+    font: 600 14px var(--font-body); color: var(--ink); background: #fff;
+    border: 2.5px solid var(--ink); border-radius: 6px; padding: 7px 9px; max-width: 100%;
+  }
+  input[type=range], input[type=checkbox] { accent-color: var(--grass); }
+  input[type=checkbox] { width: 18px; height: 18px; margin: 0; flex: none; }
+  input[type=range] { width: 100%; min-width: 0; }
+  .field { display: grid; gap: 5px; font-weight: 700; font-size: 14px; align-content: start; }
+  .help { font-weight: 400; color: var(--ink-soft); font-size: 13px; min-height: 1.3em; }
+  .check { display: flex; gap: 10px; align-items: center; font-weight: 600; cursor: pointer; }
+  .hint { font-size: 13px; color: var(--ink-soft); margin: 10px 0 0; }
+  code { font: 13px var(--font-code); background: var(--chalk); border: 1.5px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+
+  .slider-row { display: grid; grid-template-columns: 140px 1fr 48px auto; gap: 12px; align-items: center; margin-top: 12px; }
+  .slider-row > label { font-weight: 700; font-size: 14px; }
+  .val { font-weight: 800; text-align: center; background: var(--chalk); border: 2px solid var(--ink); border-radius: 5px; padding: 2px 0; }
+
+  details.more { border: 2px solid var(--line); border-radius: 8px; padding: 12px 14px; margin-top: 14px; background: #FBFCFA; }
+  details.more summary { font-weight: 700; cursor: pointer; }
+  details.more[open] > summary { margin-bottom: 10px; }
+
+  .swatch { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--ink); border-radius: 3px; flex: none; }
+
+  /* ---------- 1. Load ---------- */
+  .drop {
+    display: grid; justify-items: center; gap: 4px; text-align: center;
+    padding: 34px 16px; border: 3px dashed var(--ink); border-radius: 12px;
+    background: var(--grass-tint); cursor: pointer;
+  }
+  .drop:hover, .drop.over { background: var(--gold-tint); }
+  .drop .block {
+    width: 56px; height: 56px; display: grid; place-items: center; font-size: 30px;
+    background: var(--gold); border: 3px solid var(--ink); border-radius: 8px;
+    box-shadow: 0 5px 0 var(--ink); margin-bottom: 10px;
+  }
+  .drop strong { font: 800 20px var(--font-display); }
+  .drop span { color: var(--ink-soft); }
+  #filenameLabel:empty { display: none; }
+  .file-chip { display: inline-block; margin-top: 14px; padding: 5px 12px; background: #fff; border: 2.5px solid var(--ink); border-radius: 6px; font-weight: 700; }
+  .file-error { margin-top: 14px; padding: 8px 12px; color: #fff; background: var(--danger); border: 2.5px solid var(--ink); border-radius: 6px; font-weight: 700; }
+
+  /* ---------- 2. Sounds ---------- */
+  .track-row {
+    display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center;
+    padding: 10px 12px; border: 2px solid var(--line); border-radius: 8px; margin-bottom: 8px; background: #fff;
+  }
+  .track-row:has(input:checked) { border-color: var(--ink); }
+  .t-title { font-weight: 700; }
+  .t-meta, .drum-note { font-size: 13px; color: var(--ink-soft); }
+  .t-sound { display: flex; gap: 8px; align-items: center; }
+
+  /* ---------- 3. Edit ---------- */
+  .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
+  .toolbar .spacer { flex: 1; }
+  .status { font-size: 13px; color: var(--ink-soft); font-weight: 600; }
+  .zoom { display: flex; gap: 8px; align-items: center; font-size: 13px; font-weight: 700; }
+  .zoom input { width: 110px; }
+  .roll { background: var(--night); border: 3px solid var(--ink); border-radius: 8px; overflow: auto; max-height: 380px; }
+  .roll canvas { display: block; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 12px; font-size: 13px; color: var(--ink-soft); }
+  .legend:empty { display: none; }
+  .legend-item { display: inline-flex; gap: 6px; align-items: center; }
+  .inspector { margin-top: 16px; padding: 14px; background: var(--gold-tint); border: 2.5px solid var(--ink); border-radius: 8px; }
+  .inspector .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; }
+  .inspector .actions { display: flex; gap: 10px; margin-top: 14px; }
+  .notice { margin-top: 14px; padding: 10px 14px; background: var(--sky-tint); border: 2.5px solid var(--ink); border-radius: 8px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
+
+  /* ---------- 4. Script ---------- */
+  .opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; margin-bottom: 16px; }
+  .song-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 12px; border: 2px solid var(--line); border-radius: 8px; margin-bottom: 6px; background: #fff; }
+  .song-name { font-weight: 700; }
+  .song-meta { color: var(--ink-soft); font-size: 13px; margin-left: 8px; }
+  .empty { color: var(--ink-soft); font-size: 14px; }
+  .code-box { display: flex; background: var(--night); border: 3px solid var(--ink); border-radius: 8px; max-height: 340px; overflow: auto; margin-top: 16px; }
+  .gutter {
+    position: sticky; left: 0; background: var(--night); color: #5F7386; text-align: right;
+    padding: 12px 10px; font: 12px/1.5 var(--font-code); border-right: 2px solid var(--night-line);
+    user-select: none; white-space: pre;
+  }
+  #outputCode { margin: 0; padding: 12px 14px; font: 12px/1.5 var(--font-code); color: #DCE8F2; white-space: pre; cursor: text; }
+  .actions-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; align-items: center; }
+  .size { margin-left: auto; font-size: 13px; color: var(--ink-soft); }
+  .chunk-row { display: flex; gap: 12px; align-items: center; margin-top: 10px; }
+  .chunk-label { font-weight: 700; min-width: 90px; }
+
+  .howto { counter-reset: s; list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+  .howto li { counter-increment: s; display: grid; grid-template-columns: 34px 1fr; gap: 12px; align-items: start; }
+  .howto li::before {
+    content: counter(s); display: grid; place-items: center; width: 34px; height: 34px;
+    border: 2.5px solid var(--ink); border-radius: 6px; background: var(--grass); color: #fff; font-weight: 800;
+  }
+  .tips { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
+
+  @media (max-width: 640px) {
+    .steps .lbl { display: none; }
+    .step { padding: 28px 16px 20px; }
+    h1 { font-size: 26px; }
+    .slider-row { grid-template-columns: 1fr 48px; }
+    .slider-row > label { grid-column: 1 / -1; }
+    .slider-row select { grid-column: 1 / -1; }
+    .track-row { grid-template-columns: auto 1fr; }
+    .t-sound { grid-column: 1 / -1; }
+    .size { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="logo" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+    <div>
+      <h1>MIDI to Bloxd</h1>
+      <p class="tagline">Turn a MIDI song into a script that plays in your Bloxd.io world.</p>
+    </div>
+  </header>
+
+  <nav class="steps" aria-label="Steps">
+    <a href="#s1" data-step="s1" class="active" aria-label="Step 1, load song"><span class="num">1</span><span class="lbl">Load song</span></a>
+    <a href="#s2" data-step="s2" aria-label="Step 2, pick sounds"><span class="num">2</span><span class="lbl">Pick sounds</span></a>
+    <a href="#s3" data-step="s3" aria-label="Step 3, edit notes"><span class="num">3</span><span class="lbl">Edit notes</span></a>
+    <a href="#s4" data-step="s4" aria-label="Step 4, get script"><span class="num">4</span><span class="lbl">Get script</span></a>
+  </nav>
+
+  <!-- 1. Load -->
+  <section class="step" id="s1">
+    <h2>Load a song</h2>
+    <p class="lead">Choose a .mid file from your computer. It stays in this browser and is never uploaded.</p>
+    <div class="drop" id="dropZone" tabindex="0" role="button" aria-label="Choose a MIDI file">
+      <div class="block" aria-hidden="true">&#9834;</div>
+      <strong>Drop a MIDI file here</strong>
+      <span>or click to choose one</span>
+    </div>
+    <input type="file" id="fileInput" accept=".mid,.midi" hidden>
+    <div id="filenameLabel" role="status"></div>
+  </section>
+
+  <!-- 2. Sounds -->
+  <section class="step" id="s2" hidden>
+    <h2>Pick sounds</h2>
+    <p class="lead">Keep the tracks you want and choose which Bloxd sound plays each one.</p>
+
+    <div id="trackList"></div>
+
+    <div class="slider-row" style="margin-top:22px;">
+      <label for="baseNote">Song pitch</label>
+      <input type="range" id="baseNote" min="36" max="84" value="60">
+      <span class="val" id="baseNoteVal">C4</span>
+    </div>
+    <p class="hint">Move this if the whole song sounds too high or too low in Bloxd.</p>
+
+    <details class="more">
+      <summary>Use different sounds for low and high notes</summary>
+      <label class="check"><input type="checkbox" id="splitEnabled"> Turn on pitch-range sounds</label>
+      <p class="hint">A sound stretched far from its natural pitch can sound thin or harsh. Low notes use the low sound, high notes use the high sound, and everything in between keeps its track's sound. Drums stay as they are.</p>
+      <div class="slider-row">
+        <label for="splitLow">Low notes below</label>
+        <input type="range" id="splitLow" min="24" max="84" value="48">
+        <span class="val" id="splitLowVal">C3</span>
+        <select id="splitLowSound" aria-label="Sound for low notes"></select>
+      </div>
+      <div class="slider-row">
+        <label for="splitHigh">High notes from</label>
+        <input type="range" id="splitHigh" min="36" max="108" value="72">
+        <span class="val" id="splitHighVal">C5</span>
+        <select id="splitHighSound" aria-label="Sound for high notes"></select>
+      </div>
+      <p class="hint" id="splitStatus">Changing these replaces any sound you set on a single note. Timing, pitch, length and volume edits stay.</p>
+    </details>
+
+    <details class="more">
+      <summary>Why might the pitch sound off?</summary>
+      <p class="hint" style="margin-top:0;">Bloxd shifts a sound's pitch with its rate setting. This tool can't know the exact starting pitch of every Bloxd sound, so your first test in the game may need a small nudge with Song pitch.</p>
+    </details>
+  </section>
+
+  <!-- 3. Edit -->
+  <section class="step" id="s3" hidden>
+    <h2>Edit notes</h2>
+    <p class="lead">Fix anything that sounds off. Every change goes straight into your script.</p>
+
+    <div class="toolbar">
+      <button id="playBtn" class="primary">Play preview</button>
+      <button id="stopBtn">Stop</button>
+      <span class="status" id="playStatus" role="status"></span>
+      <span class="spacer"></span>
+      <button id="resetEditsBtn" class="small">Reset edits</button>
+      <label class="zoom" for="zoomSlider">Zoom <input type="range" id="zoomSlider" min="10" max="200" value="60"><span id="zoomVal">60 px/s</span></label>
+    </div>
+
+    <div class="roll" id="editorScroll">
+      <canvas id="editorCanvas" width="800" height="200" aria-label="Piano roll of the song's notes"></canvas>
+    </div>
+    <div class="legend" id="legend"></div>
+    <p class="hint">Drag a note to move it, drag its right edge to change its length, double-click empty space to add a note, and press Delete to remove the selected note. The preview uses a simple synth, not Bloxd's real sounds.</p>
+
+    <div class="notice" id="staleNotice" hidden>
+      <span>You changed tracks or sounds in step 2 after editing notes.</span>
+      <button id="reloadEditorBtn" class="small">Rebuild notes from tracks</button>
+    </div>
+
+    <div class="inspector" id="selectedNoteFields" style="display:none">
+      <div class="grid">
+        <label class="field">Pitch (0 to 127) <input type="number" id="selPitch" min="0" max="127"></label>
+        <label class="field">Start (ms) <input type="number" id="selStart" min="0"></label>
+        <label class="field">Length (ms) <input type="number" id="selDur" min="10"></label>
+        <label class="field">Volume (0 to 1) <input type="number" id="selVel" min="0" max="1" step="0.05"></label>
+        <label class="field">Sound <select id="selSound"></select></label>
+      </div>
+      <div class="actions">
+        <button id="applyNoteBtn" class="primary small">Apply changes</button>
+        <button id="deleteNoteBtn" class="small">Delete note</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. Script -->
+  <section class="step" id="s4" hidden>
+    <h2>Get your script</h2>
+    <p class="lead">Copy the script, then follow the steps below to run it in your world.</p>
+
+    <div class="opts">
+      <label class="field">Song name
+        <input type="text" id="songNameInput" placeholder="e.g. Jumper" autocomplete="off">
+        <span class="help" id="addSongStatus"></span>
+      </label>
+      <label class="field">Play this song when the script runs
+        <select id="autoSongSelect"></select>
+      </label>
+    </div>
+    <label class="check"><input type="checkbox" id="existingTickBox"> My world already has its own tick function (don't overwrite it)</label>
+
+    <div class="subhead" style="font-size:16px; margin-top:22px;">Songs in this script</div>
+    <div id="songLibraryList"></div>
+    <p class="hint" style="margin-top:6px;">Load another .mid file in step 1 to add more songs. They all go into one script.</p>
+
+    <div class="code-box">
+      <div class="gutter" id="lineNumbers"></div>
+      <pre id="outputCode"></pre>
+    </div>
+    <div class="actions-row">
+      <button id="copyBtn" class="primary">Copy script</button>
+      <button id="downloadBtn">Download file</button>
+      <button id="compactBtn">Shrink code</button>
+      <button id="splitBtn">Split for pasting</button>
+      <span class="size" id="scriptSize"></span>
+    </div>
+    <div id="chunksPanel" style="display:none; margin-top:14px;">
+      <p class="hint" id="chunksSummary" style="margin-top:0;"></p>
+      <div id="chunksList"></div>
+    </div>
+
+    <h3 class="subhead">Run it in Bloxd.io</h3>
+    <ol class="howto">
+      <li><div><strong>Open a world you own.</strong> Bloxd only runs world code for owners of worlds lobbies, not in public games.</div></li>
+      <li><div><strong>Place a Code Block.</strong> Open the creative menu, search for Code Block, and put one down.</div></li>
+      <li><div><strong>Paste your script.</strong> Open the Code Block, clear anything inside, and paste. If the paste gets cut off, use Split for pasting and paste the parts in order.</div></li>
+      <li><div><strong>Add a board next to it.</strong> Write <code>press to code</code> on the board. That text goes on the board only, never inside the Code Block.</div></li>
+      <li><div><strong>Right-click the board.</strong> The song starts for you. Right-click again to restart it.</div></li>
+    </ol>
+
+    <details class="more">
+      <summary>Nothing plays or it sounds wrong</summary>
+      <ul class="tips">
+        <li>Turn up your in-game sound volume. The song plays only for the player who right-clicked.</li>
+        <li>Whole song too high or too low? Change Song pitch in step 2.</li>
+        <li>Wrong instrument or drums? Change that track's sound in step 2, or a single note's sound in step 3.</li>
+        <li>Already have your own <code>tick</code> code? Tick the box above, then add the line <code>songTick(ms);</code> inside your existing tick.</li>
+        <li>Bloxd world code currently ignores <code>//</code> comments, so this tool only writes <code>/* ... */</code> comments. Don't add <code>//</code> comments yourself.</li>
+        <li>To start a different song, change the name on the last line of the script: <code>playSequence(api, playerId, "Song name");</code></li>
+      </ul>
+    </details>
+  </section>
+
+</div>
+
+<script>
+/* ---------- Minimal standard MIDI file parser (no external deps) ---------- */
+function readVarLen(view, pos) {
+  let value = 0, byte;
+  do {
+    byte = view.getUint8(pos++);
+    value = (value << 7) | (byte & 0x7f);
+  } while (byte & 0x80);
+  return { value, pos };
+}
+
+function parseMidi(buffer) {
+  const view = new DataView(buffer);
+  let pos = 0;
+  function str(n) { let s=''; for (let i=0;i<n;i++) s += String.fromCharCode(view.getUint8(pos+i)); pos+=n; return s; }
+
+  if (str(4) !== 'MThd') throw new Error('this is not a MIDI file');
+  const headerLen = view.getUint32(pos); pos += 4;
+  const format = view.getUint16(pos); pos += 2;
+  const ntrks = view.getUint16(pos); pos += 2;
+  const division = view.getUint16(pos); pos += 2;
+  pos += (headerLen - 6);
+
+  const ppq = (division & 0x8000) ? 480 : division;
+  const tracks = [];
+  const tempoEvents = [{ tick: 0, mpqn: 500000 }];
+
+  for (let t = 0; t < ntrks; t++) {
+    if (str(4) !== 'MTrk') break;
+    const trackLen = view.getUint32(pos); pos += 4;
+    const trackEnd = pos + trackLen;
+    let tick = 0;
+    let runningStatus = null;
+    const events = [];
+
+    while (pos < trackEnd) {
+      const dt = readVarLen(view, pos); pos = dt.pos; tick += dt.value;
+      let statusByte = view.getUint8(pos);
+
+      if (statusByte === 0xFF) {
+        pos++;
+        const metaType = view.getUint8(pos); pos++;
+        const len = readVarLen(view, pos); pos = len.pos;
+        if (metaType === 0x51) {
+          const mpqn = (view.getUint8(pos) << 16) | (view.getUint8(pos+1) << 8) | view.getUint8(pos+2);
+          tempoEvents.push({ tick, mpqn });
+        }
+        pos += len.value;
+      } else if (statusByte === 0xF0 || statusByte === 0xF7) {
+        pos++;
+        const len = readVarLen(view, pos); pos = len.pos;
+        pos += len.value;
+      } else {
+        if (statusByte & 0x80) { runningStatus = statusByte; pos++; }
+        else { statusByte = runningStatus; }
+        const type = statusByte & 0xF0;
+        const channel = statusByte & 0x0F;
+        const d1 = view.getUint8(pos); pos++;
+        let d2 = null;
+        if (type !== 0xC0 && type !== 0xD0) { d2 = view.getUint8(pos); pos++; }
+
+        if (type === 0x90 && d2 > 0) {
+          events.push({ tick, type: 'on', note: d1, velocity: d2, channel });
+        } else if (type === 0x80 || (type === 0x90 && d2 === 0)) {
+          events.push({ tick, type: 'off', note: d1, channel });
+        } else if (type === 0xC0) {
+          events.push({ tick, type: 'program', program: d1, channel });
+        }
+      }
+    }
+    tracks.push(events);
+    pos = trackEnd;
+  }
+
+  tempoEvents.sort((a,b) => a.tick - b.tick);
+  return { ppq, tracks, tempoEvents };
+}
+
+function tickToMs(tick, ppq, tempoEvents) {
+  let ms = 0, lastTick = 0, lastMpqn = tempoEvents[0].mpqn;
+  for (const te of tempoEvents) {
+    if (te.tick >= tick) break;
+    ms += (te.tick - lastTick) * (lastMpqn / ppq) / 1000;
+    lastTick = te.tick; lastMpqn = te.mpqn;
+  }
+  ms += (tick - lastTick) * (lastMpqn / ppq) / 1000;
+  return ms;
+}
+
+function extractNotes(events, ppq, tempoEvents) {
+  const open = {};
+  const notes = [];
+  for (const ev of events) {
+    const key = ev.note;
+    if (ev.type === 'on') {
+      (open[key] = open[key] || []).push({ tick: ev.tick, velocity: ev.velocity });
+    } else if (ev.type === 'off' && open[key] && open[key].length) {
+      const startEv = open[key].shift();
+      const startMs = tickToMs(startEv.tick, ppq, tempoEvents);
+      const endMs = tickToMs(ev.tick, ppq, tempoEvents);
+      notes.push({ pitch: key, startMs, durMs: Math.max(50, endMs - startMs), velocity: startEv.velocity });
+    }
+  }
+  notes.sort((a,b) => a.startMs - b.startMs);
+  return notes;
+}
+
+/* Which MIDI channel and GM program a track mostly uses, and whether it's the
+   percussion channel (MIDI channel 10, index 9: notes there are drum hits, not pitches). */
+function analyzeTrack(events) {
+  let channel = null, program = null;
+  for (const ev of events) {
+    if (ev.type === 'on' && channel === null) channel = ev.channel;
+    if (ev.type === 'program' && program === null) program = ev.program;
+  }
+  return { channel, program, isDrum: channel === 9 };
+}
+
+const GM_FAMILIES = ['Piano','Chromatic percussion','Organ','Guitar','Bass','Strings','Ensemble','Brass','Reed','Pipe','Synth lead','Synth pad','Synth effects','Ethnic','Percussive','Sound effects'];
+
+/* Bloxd's "note" sound set (Bloxdy/code-api, SOUNDS_AND_MUSIC.md): harp_pling, bass,
+   bassattack, trumpetNote1-3, trumpetFlare, hat, snare, bd, lowDrum1-3, sonarBeep,
+   levelup, drumSwish1-2, bigDrumSwish1-3. Not a full orchestra, so the instrument
+   mapping is a best-effort guess per track. */
+const INSTRUMENT_OPTIONS = ['harp_pling','bass','bassattack','trumpetNote1','trumpetNote2','trumpetNote3','trumpetFlare','hat','snare','bd','lowDrum1','lowDrum2','lowDrum3','sonarBeep','levelup'];
+const ALL_SOUND_OPTIONS = INSTRUMENT_OPTIONS.concat(['bigDrumSwish1','bigDrumSwish2','bigDrumSwish3','drumSwish1','drumSwish2']);
+
+const SOUND_COLORS = {
+  harp_pling: '#5CB8E6', bass: '#E07B39', bassattack: '#C0562B',
+  trumpetNote1: '#F4B63F', trumpetNote2: '#F7CB6B', trumpetNote3: '#E8A21F', trumpetFlare: '#FBE08A',
+  hat: '#B8C4CE', snare: '#E8EEF2', bd: '#E4604F',
+  lowDrum1: '#A96FD1', lowDrum2: '#8E58B8', lowDrum3: '#C497E3',
+  sonarBeep: '#4CD6B4', levelup: '#7CE05A',
+  bigDrumSwish1: '#8796A5', bigDrumSwish2: '#6F8091', bigDrumSwish3: '#9FB0BF',
+  drumSwish1: '#7C8CA0', drumSwish2: '#93A3B5'
+};
+function soundColor(s) { return SOUND_COLORS[s] || '#5CB8E6'; }
+
+function gmProgramToSound(program) {
+  if (program === null || program === undefined) return 'harp_pling';
+  if (program >= 32 && program <= 39) return 'bass';
+  if (program >= 56 && program <= 63) return 'trumpetNote1';
+  if (program >= 104 && program <= 119) return 'lowDrum1';
+  if (program >= 120 && program <= 127) return 'sonarBeep';
+  return 'harp_pling';
+}
+
+function gmDrumNoteToSound(pitch) {
+  if (pitch === 35 || pitch === 36) return 'bd';
+  if (pitch >= 37 && pitch <= 40) return 'snare';
+  if (pitch === 42 || pitch === 44 || pitch === 46) return 'hat';
+  if (pitch === 49 || pitch === 52 || pitch === 55 || pitch === 57) return 'bigDrumSwish1';
+  if (pitch === 51 || pitch === 53 || pitch === 59) return 'hat';
+  return 'lowDrum1';
+}
+
+/* ---------- Pitch -> Bloxd rate math ---------- */
+function rateForPitch(pitch, basePitch) {
+  return Math.pow(2, (pitch - basePitch) / 12);
+}
+function noteName(pitch) {
+  const names = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  const octave = Math.floor(pitch / 12) - 1;
+  return names[pitch % 12] + octave;
+}
+
+/* ---------- State ---------- */
+const $ = id => document.getElementById(id);
+let parsedMidi = null;
+let trackNoteSets = [];
+let trackMeta = [];
+let trackSoundName = {};
+let selectedTracks = new Set();
+let audioCtx = null;
+let previewTimeouts = [];
+let editableNotes = [];
+let selectedNoteIndex = -1;
+let dragState = null;
+let editorDirty = false;
+let songLibrary = {};
+let lastSyncedName = null;
+let lastSyncSig = null;
+let syncTimer = null;
+let legendKey = '';
+let lastOutputPretty = '';
+let isCompact = false;
+
+const baseNoteSlider = $('baseNote');
+const filenameLabel = $('filenameLabel');
+
+/* ---------- 1. Load ---------- */
+const dropZone = $('dropZone');
+const fileInput = $('fileInput');
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('keydown', e => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
+});
+['dragenter', 'dragover'].forEach(t => dropZone.addEventListener(t, e => {
+  e.preventDefault(); dropZone.classList.add('over');
+}));
+['dragleave', 'drop'].forEach(t => dropZone.addEventListener(t, e => {
+  e.preventDefault(); dropZone.classList.remove('over');
+}));
+dropZone.addEventListener('drop', e => {
+  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e => {
+  if (e.target.files.length) handleFile(e.target.files[0]);
+  fileInput.value = '';
+});
+
+function uniqueSongName(base) {
+  let name = base || 'Song';
+  let n = 2;
+  while (songLibrary[name]) { name = (base || 'Song') + ' ' + n; n++; }
+  return name;
+}
+
+function handleFile(file) {
+  const base = file.name.replace(/\.(mid|midi)$/i, '');
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      parsedMidi = parseMidi(reader.result);
+    } catch (err) {
+      filenameLabel.className = 'file-error';
+      filenameLabel.textContent = "Couldn't read " + file.name + ": " + err.message + ". Try a different .mid file.";
+      return;
+    }
+    lastSyncedName = null;
+    lastSyncSig = null;
+    $('songNameInput').value = uniqueSongName(base);
+    if (buildTrackList()) {
+      filenameLabel.className = 'file-chip';
+      filenameLabel.textContent = file.name;
+    } else {
+      filenameLabel.className = 'file-error';
+      filenameLabel.textContent = file.name + " has no notes to play. Try a different .mid file.";
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+/* ---------- 2. Sounds ---------- */
+function buildTrackList() {
+  const list = $('trackList');
+  list.innerHTML = '';
+  trackNoteSets = [];
+  trackMeta = [];
+  trackSoundName = {};
+  selectedTracks = new Set();
+
+  parsedMidi.tracks.forEach((events, i) => {
+    const notes = extractNotes(events, parsedMidi.ppq, parsedMidi.tempoEvents);
+    trackNoteSets.push(notes);
+    const meta = analyzeTrack(events);
+    trackMeta.push(meta);
+    if (notes.length === 0) return;
+
+    selectedTracks.add(i);
+    const guessed = meta.isDrum ? null : gmProgramToSound(meta.program);
+    if (!meta.isDrum) trackSoundName[i] = guessed;
+
+    const avgPitch = Math.round(notes.reduce((s, n) => s + n.pitch, 0) / notes.length);
+    const family = meta.isDrum ? 'Drums' : (meta.program !== null ? GM_FAMILIES[Math.floor(meta.program / 8)] : 'Track ' + (i + 1));
+
+    let soundControl;
+    if (meta.isDrum) {
+      soundControl = '<span class="drum-note">Kick, snare and hi-hat are matched per hit</span>';
+    } else {
+      const opts = INSTRUMENT_OPTIONS.map(s => '<option value="' + s + '"' + (s === guessed ? ' selected' : '') + '>' + s + '</option>').join('');
+      soundControl = '<span class="t-sound"><span class="swatch" data-swatch="' + i + '" style="background:' + soundColor(guessed) + '"></span>' +
+        '<select data-sound-idx="' + i + '" aria-label="Sound for ' + family + ' track">' + opts + '</select></span>';
+    }
+
+    const row = document.createElement('div');
+    row.className = 'track-row';
+    row.innerHTML =
+      '<input type="checkbox" checked aria-label="Keep ' + family + ' track">' +
+      '<div><div class="t-title">' + family + '</div>' +
+      '<div class="t-meta">Track ' + (i + 1) + ', ' + notes.length + ' notes, around ' + noteName(avgPitch) + '</div></div>' +
+      soundControl;
+    list.appendChild(row);
+
+    row.querySelector('input[type=checkbox]').addEventListener('change', e => {
+      if (e.target.checked) selectedTracks.add(i); else selectedTracks.delete(i);
+      onTrackSettingsChanged();
+    });
+    const select = row.querySelector('select');
+    if (select) {
+      select.addEventListener('change', e => {
+        trackSoundName[i] = e.target.value;
+        const sw = row.querySelector('[data-swatch]');
+        if (sw) sw.style.background = soundColor(e.target.value);
+        onTrackSettingsChanged();
+      });
+    }
+  });
+
+  if (selectedTracks.size === 0) return false;
+
+  ['s2', 's3', 's4'].forEach(id => { $(id).hidden = false; });
+  document.body.classList.add('loaded');
+  loadEditorFromTracks();
+  syncCurrentSong();
+  updateStepper();
+  $('s2').scrollIntoView({ block: 'start' });
+  return true;
+}
+
+function onTrackSettingsChanged() {
+  if (!editorDirty) loadEditorFromTracks();
+  else $('staleNotice').hidden = false;
+}
+
+baseNoteSlider.addEventListener('input', () => {
+  $('baseNoteVal').textContent = noteName(+baseNoteSlider.value);
+  scheduleSync();
+});
+$('baseNoteVal').textContent = noteName(+baseNoteSlider.value);
+
+/* ---------- Pitch-range sound split ---------- */
+function applyPitchSplit(silent) {
+  const enabled = $('splitEnabled').checked;
+  const low = +$('splitLow').value;
+  const high = +$('splitHigh').value;
+  const lowSound = $('splitLowSound').value;
+  const highSound = $('splitHighSound').value;
+  let changed = 0;
+  editableNotes.forEach(n => {
+    if (n.isDrum) return;
+    const base = n.baseSound || n.sound || 'harp_pling';
+    let s = base;
+    if (enabled) {
+      if (n.pitch < low) s = lowSound;
+      else if (n.pitch >= high) s = highSound;
+    }
+    if (s !== n.sound) changed++;
+    n.sound = s;
+    n.baseSound = base;
+  });
+  if (!silent) {
+    $('splitStatus').textContent = enabled
+      ? changed + ' note(s) switched sound. Below ' + noteName(low) + ' uses ' + lowSound + ', and ' + noteName(high) + ' and above uses ' + highSound + '.'
+      : 'Pitch-range sounds are off. Notes use their track sounds. Changing these replaces any sound you set on a single note.';
+    drawEditor();
+  }
+}
+
+function initSplitControls() {
+  const opts = sel => INSTRUMENT_OPTIONS.map(s => '<option value="' + s + '"' + (s === sel ? ' selected' : '') + '>' + s + '</option>').join('');
+  $('splitLowSound').innerHTML = opts('bass');
+  $('splitHighSound').innerHTML = opts('trumpetNote1');
+  const low = $('splitLow'), high = $('splitHigh');
+  low.addEventListener('input', () => { $('splitLowVal').textContent = noteName(+low.value); applyPitchSplit(false); });
+  high.addEventListener('input', () => { $('splitHighVal').textContent = noteName(+high.value); applyPitchSplit(false); });
+  ['splitEnabled', 'splitLowSound', 'splitHighSound'].forEach(id => $(id).addEventListener('change', () => applyPitchSplit(false)));
+}
+
+/* ---------- 3. Edit: piano roll ---------- */
+function loadEditorFromTracks() {
+  let all = [];
+  selectedTracks.forEach(i => {
+    const meta = trackMeta[i] || {};
+    trackNoteSets[i].forEach(n => {
+      const baseSound = meta.isDrum ? gmDrumNoteToSound(n.pitch) : (trackSoundName[i] || 'harp_pling');
+      all.push({
+        pitch: n.pitch,
+        startMs: Math.round(n.startMs),
+        durMs: Math.round(n.durMs),
+        vel: +(n.velocity / 127).toFixed(3),
+        sound: baseSound,
+        baseSound,
+        isDrum: !!meta.isDrum
+      });
+    });
+  });
+  editableNotes = all;
+  editorDirty = false;
+  $('staleNotice').hidden = true;
+  if ($('splitEnabled').checked) applyPitchSplit(true);
+  selectedNoteIndex = -1;
+  $('selectedNoteFields').style.display = 'none';
+  drawEditor();
+  centerRollOnNotes();
+}
+
+/* Open the piano roll centered on where most notes sit, so low bass and drum
+   notes are not hidden below the fold of the scroll area. */
+function centerRollOnNotes() {
+  const box = $('editorScroll'), canvas = $('editorCanvas');
+  if (!editableNotes.length || !canvas._rowH) return;
+  const avg = editableNotes.reduce((s, n) => s + n.pitch, 0) / editableNotes.length;
+  const y = (canvas._pitchMax - avg) * canvas._rowH;
+  box.scrollTop = Math.max(0, y - box.clientHeight / 2);
+  box.scrollLeft = 0;
+}
+
+function markEdited() { editorDirty = true; }
+
+function pitchRangeOf(notes) {
+  if (!notes.length) return { min: 48, max: 72 };
+  let min = 127, max = 0;
+  notes.forEach(n => { if (n.pitch < min) min = n.pitch; if (n.pitch > max) max = n.pitch; });
+  return { min: Math.max(0, min - 2), max: Math.min(127, max + 2) };
+}
+
+function updateLegend() {
+  const used = Array.from(new Set(editableNotes.map(n => n.sound || 'harp_pling'))).sort();
+  const key = used.join('|');
+  if (key === legendKey) return;
+  legendKey = key;
+  $('legend').innerHTML = used.map(s =>
+    '<span class="legend-item"><span class="swatch" style="background:' + soundColor(s) + '"></span>' + s + '</span>'
+  ).join('');
+}
+
+function drawEditor() {
+  const canvas = $('editorCanvas');
+  const ctx = canvas.getContext('2d');
+  const pxPerMs = (+$('zoomSlider').value) / 1000;
+
+  const range = pitchRangeOf(editableNotes);
+  const rowH = 9;
+  const numRows = range.max - range.min + 1;
+  const maxEndMs = editableNotes.reduce((m, n) => Math.max(m, n.startMs + n.durMs), 1000);
+  const width = Math.max(480, Math.ceil(maxEndMs * pxPerMs) + 80);
+  const height = Math.max(160, numRows * rowH + 12);
+
+  canvas.width = width;
+  canvas.height = height;
+  canvas._pxPerMs = pxPerMs;
+  canvas._rowH = rowH;
+  canvas._pitchMin = range.min;
+  canvas._pitchMax = range.max;
+
+  ctx.clearRect(0, 0, width, height);
+
+  const blackKeys = new Set([1, 3, 6, 8, 10]);
+  ctx.font = '10px system-ui, sans-serif';
+  ctx.textBaseline = 'middle';
+  for (let p = range.min; p <= range.max; p++) {
+    const y = (range.max - p) * rowH;
+    ctx.fillStyle = blackKeys.has(((p % 12) + 12) % 12) ? '#18232E' : '#202D3A';
+    ctx.fillRect(0, y, width, rowH);
+    if (p % 12 === 0) {
+      ctx.fillStyle = '#33475A';
+      ctx.fillRect(0, y + rowH - 1, width, 1);
+    }
+  }
+
+  ctx.lineWidth = 1;
+  for (let ms = 0; ms * pxPerMs < width; ms += 1000) {
+    const x = Math.round(ms * pxPerMs) + 0.5;
+    ctx.strokeStyle = (ms / 1000) % 5 === 0 ? '#3A4E62' : '#2A3947';
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
+  }
+
+  for (let p = range.min; p <= range.max; p++) {
+    if (p % 12 === 0) {
+      ctx.fillStyle = '#6C8195';
+      ctx.fillText(noteName(p), 4, (range.max - p) * rowH + rowH / 2);
+    }
+  }
+
+  editableNotes.forEach((n, i) => {
+    const x = n.startMs * pxPerMs;
+    const w = Math.max(3, n.durMs * pxPerMs);
+    const y = (range.max - n.pitch) * rowH;
+    const h = rowH - 1;
+    ctx.globalAlpha = 0.5 + 0.5 * Math.min(1, Math.max(0, n.vel));
+    ctx.fillStyle = soundColor(n.sound);
+    ctx.fillRect(x, y, w, h);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.fillRect(x, y, w, 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.fillRect(x, y + h - 2, w, 2);
+    ctx.fillRect(x + w - 2, y, 2, h);
+    if (i === selectedNoteIndex) {
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x + 1, y + 1, Math.max(1, w - 2), h - 2);
+    }
+  });
+  ctx.globalAlpha = 1;
+
+  updateLegend();
+  scheduleSync();
+}
+
+function findNoteAt(mx, my) {
+  const canvas = $('editorCanvas');
+  const pxPerMs = canvas._pxPerMs, rowH = canvas._rowH, pitchMax = canvas._pitchMax;
+  for (let i = editableNotes.length - 1; i >= 0; i--) {
+    const n = editableNotes[i];
+    const x = n.startMs * pxPerMs;
+    const w = Math.max(3, n.durMs * pxPerMs);
+    const y = (pitchMax - n.pitch) * rowH;
+    if (mx >= x && mx <= x + w && my >= y && my <= y + rowH) {
+      return { index: i, nearRightEdge: (x + w - mx) <= 6 };
+    }
+  }
+  return null;
+}
+
+function updateSelectedFields() {
+  const box = $('selectedNoteFields');
+  if (selectedNoteIndex < 0 || !editableNotes[selectedNoteIndex]) {
+    box.style.display = 'none';
+    return;
+  }
+  const n = editableNotes[selectedNoteIndex];
+  box.style.display = 'block';
+  $('selPitch').value = n.pitch;
+  $('selStart').value = n.startMs;
+  $('selDur').value = n.durMs;
+  $('selVel').value = n.vel;
+  const currentSound = n.sound || 'harp_pling';
+  const options = ALL_SOUND_OPTIONS.includes(currentSound) ? ALL_SOUND_OPTIONS : ALL_SOUND_OPTIONS.concat([currentSound]);
+  $('selSound').innerHTML = options.map(s => '<option value="' + s + '"' + (s === currentSound ? ' selected' : '') + '>' + s + '</option>').join('');
+}
+
+const editorCanvas = $('editorCanvas');
+
+editorCanvas.addEventListener('mousedown', e => {
+  const rect = editorCanvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  const hit = findNoteAt(mx, my);
+  if (hit) {
+    selectedNoteIndex = hit.index;
+    const n = editableNotes[hit.index];
+    dragState = {
+      mode: hit.nearRightEdge ? 'resize' : 'move',
+      index: hit.index,
+      startMouseX: mx, startMouseY: my,
+      origStartMs: n.startMs, origPitch: n.pitch, origDurMs: n.durMs
+    };
+  } else {
+    selectedNoteIndex = -1;
+  }
+  updateSelectedFields();
+  drawEditor();
+});
+
+window.addEventListener('mousemove', e => {
+  if (!dragState) return;
+  const rect = editorCanvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  const pxPerMs = editorCanvas._pxPerMs, rowH = editorCanvas._rowH;
+  const n = editableNotes[dragState.index];
+  if (!n) return;
+  if (dragState.mode === 'move') {
+    const dMs = (mx - dragState.startMouseX) / pxPerMs;
+    const dPitch = -Math.round((my - dragState.startMouseY) / rowH);
+    n.startMs = Math.max(0, Math.round(dragState.origStartMs + dMs));
+    n.pitch = Math.min(127, Math.max(0, dragState.origPitch + dPitch));
+  } else if (dragState.mode === 'resize') {
+    const dMs = (mx - dragState.startMouseX) / pxPerMs;
+    n.durMs = Math.max(20, Math.round(dragState.origDurMs + dMs));
+  }
+  markEdited();
+  drawEditor();
+  updateSelectedFields();
+});
+
+window.addEventListener('mouseup', () => { dragState = null; });
+
+editorCanvas.addEventListener('dblclick', e => {
+  const rect = editorCanvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  if (findNoteAt(mx, my)) return;
+  const pxPerMs = editorCanvas._pxPerMs, rowH = editorCanvas._rowH, pitchMax = editorCanvas._pitchMax;
+  const pitch = Math.min(127, Math.max(0, pitchMax - Math.floor(my / rowH)));
+  const startMs = Math.max(0, Math.round(mx / pxPerMs));
+  editableNotes.push({ pitch, startMs, durMs: 300, vel: 0.8, sound: 'harp_pling', baseSound: 'harp_pling', isDrum: false });
+  selectedNoteIndex = editableNotes.length - 1;
+  markEdited();
+  updateSelectedFields();
+  drawEditor();
+});
+
+$('zoomSlider').addEventListener('input', () => {
+  $('zoomVal').textContent = $('zoomSlider').value + ' px/s';
+  drawEditor();
+});
+
+$('applyNoteBtn').addEventListener('click', () => {
+  if (selectedNoteIndex < 0 || !editableNotes[selectedNoteIndex]) return;
+  const n = editableNotes[selectedNoteIndex];
+  const pitchVal = +$('selPitch').value;
+  const startVal = +$('selStart').value;
+  const durVal = +$('selDur').value;
+  const velVal = +$('selVel').value;
+  const soundVal = $('selSound').value;
+  n.pitch = Math.min(127, Math.max(0, isNaN(pitchVal) ? n.pitch : pitchVal));
+  n.startMs = Math.max(0, isNaN(startVal) ? n.startMs : Math.round(startVal));
+  n.durMs = Math.max(10, isNaN(durVal) ? n.durMs : Math.round(durVal));
+  n.vel = Math.min(1, Math.max(0, isNaN(velVal) ? n.vel : velVal));
+  if (soundVal) n.sound = soundVal;
+  markEdited();
+  drawEditor();
+});
+
+function deleteSelectedNote() {
+  if (selectedNoteIndex < 0) return;
+  editableNotes.splice(selectedNoteIndex, 1);
+  selectedNoteIndex = -1;
+  markEdited();
+  updateSelectedFields();
+  drawEditor();
+}
+$('deleteNoteBtn').addEventListener('click', deleteSelectedNote);
+
+document.addEventListener('keydown', e => {
+  if (selectedNoteIndex < 0) return;
+  const active = document.activeElement;
+  const tag = active && active.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    e.preventDefault();
+    deleteSelectedNote();
+  }
+});
+
+function confirmReload() {
+  if (editorDirty && !window.confirm('This discards the note edits you made in the piano roll. Continue?')) return;
+  loadEditorFromTracks();
+}
+$('reloadEditorBtn').addEventListener('click', confirmReload);
+$('resetEditsBtn').addEventListener('click', confirmReload);
+
+/* ---------- Preview (Web Audio synth, no Bloxd samples) ---------- */
+$('playBtn').addEventListener('click', () => {
+  stopPreview();
+  const notes = editableNotes.slice().sort((a,b) => a.startMs - b.startMs);
+  if (!notes.length) return;
+  audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+  const t0 = audioCtx.currentTime + 0.1;
+  const startRef = notes[0].startMs;
+
+  notes.forEach(n => {
+    const startSec = (n.startMs - startRef) / 1000;
+    const durSec = Math.min(n.durMs / 1000, 1.2);
+    const peakGain = 0.25 * (n.vel !== undefined ? n.vel : 1);
+
+    if (n.isDrum) {
+      const bufSize = Math.max(1, Math.floor(audioCtx.sampleRate * Math.min(durSec, 0.25)));
+      const buffer = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufSize);
+      const noise = audioCtx.createBufferSource();
+      noise.buffer = buffer;
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(Math.max(0.0002, peakGain), t0 + startSec);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + startSec + Math.min(durSec, 0.25));
+      noise.connect(gain).connect(audioCtx.destination);
+      noise.start(t0 + startSec);
+      return;
+    }
+
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.value = 440 * Math.pow(2, (n.pitch - 69) / 12);
+    gain.gain.setValueAtTime(0.0001, t0 + startSec);
+    gain.gain.exponentialRampToValueAtTime(Math.max(0.0002, peakGain), t0 + startSec + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + startSec + durSec);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t0 + startSec);
+    osc.stop(t0 + startSec + durSec + 0.05);
+  });
+
+  $('playStatus').textContent = 'Playing preview';
+  const totalMs = (notes[notes.length-1].startMs - startRef) + notes[notes.length-1].durMs + 300;
+  previewTimeouts.push(setTimeout(() => { $('playStatus').textContent = ''; }, totalMs));
+});
+
+$('stopBtn').addEventListener('click', stopPreview);
+function stopPreview() {
+  previewTimeouts.forEach(clearTimeout);
+  previewTimeouts = [];
+  if (audioCtx) { audioCtx.close(); audioCtx = null; }
+  $('playStatus').textContent = '';
+}
+
+/* ---------- 4. Script: library, sync and generated code ---------- */
+function renderOutput(text) {
+  $('outputCode').textContent = text;
+  const lineCount = text.split('\n').length;
+  let nums = '';
+  for (let i = 1; i <= lineCount; i++) nums += i + '\n';
+  $('lineNumbers').textContent = nums;
+  $('scriptSize').textContent = text.length.toLocaleString() + ' characters';
+  $('chunksPanel').style.display = 'none';
+}
+
+function rebuildLibraryOutput() {
+  isCompact = false;
+  $('compactBtn').textContent = 'Shrink code';
+
+  const names = Object.keys(songLibrary);
+  if (!names.length) {
+    renderOutput('/* Load a song to generate your script. */');
+    lastOutputPretty = $('outputCode').textContent;
+    return;
+  }
+
+  const songsBlock = names.map(name =>
+    `  ${JSON.stringify(name)}: ${JSON.stringify(songLibrary[name], null, 2).replace(/\n/g, '\n  ')}`
+  ).join(',\n');
+
+  const totalNotes = names.reduce((sum, n) => sum + songLibrary[n].length, 0);
+
+  const autoSel = $('autoSongSelect');
+  const keepSong = autoSel.value && names.includes(autoSel.value) ? autoSel.value : names[0];
+  autoSel.innerHTML = names.map(n => '<option value="' + n.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;') + '"' + (n === keepSong ? ' selected' : '') + '>' + n.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>').join('');
+  const useExistingTick = $('existingTickBox').checked;
+
+  /* Bloxd world code does not support // comments, so the generated script
+     only uses block comments. */
+  const tickLine = useExistingTick
+    ? '/* You said your world already has its own tick: add the line  songTick(ms);  inside it. */'
+    : 'tick = function(ms) { songTick(ms); };';
+
+  const text =
+`/* Song library generated from your MIDI files (${names.length} song(s), ${totalNotes} notes total).
+   Right-click the board / run the code block to start the song below.
+   Timing counts tick() calls (20 per second) instead of using timers. */
+
+const SONGS = {
+${songsBlock}
+};
+
+let songQueue = null;
+let songTicks = 0;
+let songIndex = 0;
+let songPlayerId = null;
+let songVolume = 1.0;
+let songPlaying = false;
+
+function playSequence(api, playerId, songName, volume = 1.0) {
+  const seq = SONGS[songName];
+  if (!seq) {
+    console.log("Unknown song name: " + songName);
+    return;
+  }
+  songQueue = seq;
+  songPlayerId = playerId;
+  songVolume = volume;
+  songTicks = 0;
+  songIndex = 0;
+  songPlaying = true;
+}
+
+function songTick(ms) {
+  if (!songPlaying || songPlayerId === null || !songQueue) return;
+
+  songTicks++;
+  const elapsed = songTicks * 50;
+
+  while (songIndex < songQueue.length && songQueue[songIndex].startMs <= elapsed) {
+    const n = songQueue[songIndex];
+    api.playSound(songPlayerId, n.sound, n.vel * songVolume, n.rate);
+    songIndex++;
+  }
+
+  if (songIndex >= songQueue.length) {
+    songPlaying = false;
+  }
+}
+
+/* api.playSound has no duration or stop parameter, so every note is a one-shot
+   hit. n.durMs is kept in the data for reference but is not used. */
+
+${tickLine}
+
+playSequence(api, playerId, ${JSON.stringify(keepSong)});
+`;
+
+  renderOutput(text);
+  lastOutputPretty = text;
+}
+
+function refreshLibraryUI() {
+  const list = $('songLibraryList');
+  const names = Object.keys(songLibrary);
+  if (!names.length) {
+    list.innerHTML = '<div class="empty">No songs yet.</div>';
+    return;
+  }
+  list.innerHTML = '';
+  names.forEach(name => {
+    const row = document.createElement('div');
+    row.className = 'song-row';
+
+    const label = document.createElement('span');
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'song-name';
+    nameSpan.textContent = name;
+    const metaSpan = document.createElement('span');
+    metaSpan.className = 'song-meta';
+    metaSpan.textContent = songLibrary[name].length + ' notes';
+    label.appendChild(nameSpan);
+    label.appendChild(metaSpan);
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'small';
+    removeBtn.textContent = 'Remove';
+    removeBtn.setAttribute('aria-label', 'Remove ' + name + ' from the script');
+    removeBtn.addEventListener('click', () => {
+      delete songLibrary[name];
+      if (name === lastSyncedName) { lastSyncedName = null; lastSyncSig = null; }
+      refreshLibraryUI();
+      rebuildLibraryOutput();
+    });
+
+    row.appendChild(label);
+    row.appendChild(removeBtn);
+    list.appendChild(row);
+  });
+}
+
+/* The song in the editor is saved into the script automatically. */
+function currentSongName() { return $('songNameInput').value.trim() || 'Song'; }
+
+function buildSeq() {
+  const base = +baseNoteSlider.value;
+  return editableNotes.slice().sort((a, b) => a.startMs - b.startMs).map(n => ({
+    pitch: n.pitch,
+    note: noteName(n.pitch),
+    rate: n.isDrum ? 1 : +rateForPitch(n.pitch, base).toFixed(4),
+    startMs: n.startMs,
+    durMs: n.durMs,
+    vel: n.vel,
+    sound: n.sound || 'harp_pling'
+  }));
+}
+
+function syncCurrentSong() {
+  clearTimeout(syncTimer);
+  if (!parsedMidi) return;
+  const status = $('addSongStatus');
+  const name = currentSongName();
+
+  if (!editableNotes.length) {
+    if (lastSyncedName && songLibrary[lastSyncedName]) {
+      delete songLibrary[lastSyncedName];
+      lastSyncedName = null; lastSyncSig = null;
+      refreshLibraryUI(); rebuildLibraryOutput();
+    }
+    status.textContent = 'No notes are selected. Keep at least one track in step 2.';
+    return;
+  }
+  if (songLibrary[name] && name !== lastSyncedName) {
+    status.textContent = 'Another song in the script already uses "' + name + '". Pick a different name.';
+    return;
+  }
+
+  const seq = buildSeq();
+  const sig = name + '|' + JSON.stringify(seq);
+  if (sig === lastSyncSig) return;
+  if (lastSyncedName && lastSyncedName !== name) delete songLibrary[lastSyncedName];
+  songLibrary[name] = seq;
+  lastSyncedName = name;
+  lastSyncSig = sig;
+  status.textContent = 'Saved to the script (' + seq.length + ' notes).';
+  refreshLibraryUI();
+  rebuildLibraryOutput();
+}
+
+function scheduleSync() {
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(syncCurrentSong, 350);
+}
+
+$('songNameInput').addEventListener('input', scheduleSync);
+$('autoSongSelect').addEventListener('change', rebuildLibraryOutput);
+$('existingTickBox').addEventListener('change', rebuildLibraryOutput);
+
+/* ---------- Compact (minify) ---------- */
+/* Drops block comments and the newline + indentation between lines, and leaves
+   everything else (including spaces inside song names) untouched. Every
+   statement in the generated script ends with ; or a brace, so joining lines is safe. */
+function minifyCode(code) {
+  const noComments = code.replace(/\/\*[\s\S]*?\*\//g, '');
+  return noComments
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line.length)
+    .join('');
+}
+
+$('compactBtn').addEventListener('click', () => {
+  const btn = $('compactBtn');
+  if (!lastOutputPretty) return;
+  isCompact = !isCompact;
+  if (isCompact) {
+    renderOutput(minifyCode(lastOutputPretty));
+    btn.textContent = 'Show full code';
+  } else {
+    renderOutput(lastOutputPretty);
+    btn.textContent = 'Shrink code';
+  }
+});
+
+/* ---------- Copy, download, split ---------- */
+function copyText(text, onSuccess, onFail) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    if (ok) { onSuccess(); return; }
+  } catch (e) { /* fall through */ }
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(onSuccess).catch(onFail);
+  } else {
+    onFail();
+  }
+}
+
+$('copyBtn').addEventListener('click', () => {
+  syncCurrentSong();
+  const text = $('outputCode').textContent;
+  const btn = $('copyBtn');
+  const original = 'Copy script';
+  copyText(text, () => {
+    btn.textContent = 'Copied';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = original; btn.classList.remove('copied'); }, 1500);
+  }, () => {
+    btn.textContent = 'Select the code, then press Ctrl+C';
+    setTimeout(() => { btn.textContent = original; }, 3000);
+  });
+});
+
+$('outputCode').addEventListener('click', function() {
+  const range = document.createRange();
+  range.selectNodeContents(this);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+});
+
+$('splitBtn').addEventListener('click', () => {
+  syncCurrentSong();
+  const text = $('outputCode').textContent;
+  const CHUNK_SIZE = 8000;
+  const chunks = [];
+  for (let i = 0; i < text.length; i += CHUNK_SIZE) chunks.push(text.slice(i, i + CHUNK_SIZE));
+
+  $('chunksSummary').textContent = 'Your script is ' + text.length.toLocaleString() + ' characters, split into ' + chunks.length + ' part(s). Paste the parts into the Code Block in order.';
+  const list = $('chunksList');
+  list.innerHTML = '';
+
+  chunks.forEach((chunk, i) => {
+    const row = document.createElement('div');
+    row.className = 'chunk-row';
+    const label = document.createElement('span');
+    label.className = 'chunk-label';
+    label.textContent = 'Part ' + (i + 1) + ' of ' + chunks.length;
+    const btn = document.createElement('button');
+    btn.className = 'small';
+    btn.textContent = 'Copy part ' + (i + 1) + ' (' + chunk.length.toLocaleString() + ' characters)';
+    btn.addEventListener('click', () => {
+      copyText(chunk, () => {
+        btn.classList.add('copied');
+        btn.textContent = 'Copied part ' + (i + 1);
+      }, () => {
+        btn.textContent = "Couldn't copy, try again";
+      });
+    });
+    row.appendChild(label);
+    row.appendChild(btn);
+    list.appendChild(row);
+  });
+
+  $('chunksPanel').style.display = 'block';
+});
+
+$('downloadBtn').addEventListener('click', () => {
+  syncCurrentSong();
+  const text = $('outputCode').textContent;
+  const a = document.createElement('a');
+  a.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(text);
+  a.download = 'bloxd_song_script.js';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+});
+
+/* ---------- Step navigation highlight ---------- */
+const stepIds = ['s1', 's2', 's3', 's4'];
+let stepRaf = 0;
+function updateStepper() {
+  let active = 's1';
+  stepIds.forEach(id => {
+    const el = $(id);
+    if (!el.hidden && el.getBoundingClientRect().top <= 140) active = id;
+  });
+  const activeIdx = stepIds.indexOf(active);
+  document.querySelectorAll('.steps a').forEach(a => {
+    const idx = stepIds.indexOf(a.dataset.step);
+    a.classList.toggle('active', idx === activeIdx);
+    a.classList.toggle('done', document.body.classList.contains('loaded') && idx < activeIdx);
+  });
+}
+window.addEventListener('scroll', () => {
+  cancelAnimationFrame(stepRaf);
+  stepRaf = requestAnimationFrame(updateStepper);
+}, { passive: true });
+
+/* ---------- Startup ---------- */
+initSplitControls();
+rebuildLibraryOutput();
+refreshLibraryUI();
+</script>
+</body>
+</html>
